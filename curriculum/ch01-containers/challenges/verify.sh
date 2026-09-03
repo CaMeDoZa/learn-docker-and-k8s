@@ -68,11 +68,11 @@ verify_ch01() {
 
     check \
         "Port 8080 is accessible on 127.0.0.1" \
-        "curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:8080 || (docker inspect learn-ch01-nginx --format '{{json .HostConfig.PortBindings}}' 2>/dev/null | grep -q '8080' && docker exec learn-ch01-nginx wget -qO- http://127.0.0.1:80 >/dev/null 2>&1)"
+        "curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:8080 || (docker inspect learn-ch01-nginx --format '{{json .HostConfig.PortBindings}}' 2>/dev/null | grep -q '8080' && docker exec learn-ch01-nginx sh -c 'wget -qO- http://127.0.0.1:80 2>/dev/null || curl -sf http://127.0.0.1:80 2>/dev/null' >/dev/null 2>&1)"
 
     check_output \
         "Response from 127.0.0.1:8080 contains 'Welcome to nginx'" \
-        "curl -s --connect-timeout 1 --max-time 2 http://127.0.0.1:8080 || docker exec learn-ch01-nginx wget -qO- http://127.0.0.1:80 2>/dev/null" \
+        "curl -s --connect-timeout 1 --max-time 2 http://127.0.0.1:8080 || docker exec learn-ch01-nginx sh -c 'wget -qO- http://127.0.0.1:80 2>/dev/null || curl -s http://127.0.0.1:80 2>/dev/null'" \
         "Welcome to nginx"
 
     echo ""
@@ -105,11 +105,11 @@ verify_ch02() {
 
     check \
         "Port 3000 is accessible on 127.0.0.1" \
-        "curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:3000 || (docker inspect learn-ch01-app --format '{{json .HostConfig.PortBindings}}' 2>/dev/null | grep -q '3000' && docker exec learn-ch01-app wget -qO- http://127.0.0.1:3000 >/dev/null 2>&1)"
+        "curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:3000 || (docker inspect learn-ch01-app --format '{{json .HostConfig.PortBindings}}' 2>/dev/null | grep -q '3000' && docker exec learn-ch01-app sh -c 'wget -qO- http://127.0.0.1:3000 2>/dev/null || curl -sf http://127.0.0.1:3000 2>/dev/null' >/dev/null 2>&1)"
 
     check_output \
         "Response from 127.0.0.1:3000 contains 'Hello from NoCappuccino'" \
-        "curl -s --connect-timeout 1 --max-time 2 http://127.0.0.1:3000 || docker exec learn-ch01-app wget -qO- http://127.0.0.1:3000 2>/dev/null" \
+        "curl -s --connect-timeout 1 --max-time 2 http://127.0.0.1:3000 || docker exec learn-ch01-app sh -c 'wget -qO- http://127.0.0.1:3000 2>/dev/null || curl -s http://127.0.0.1:3000 2>/dev/null'" \
         "Hello from NoCappuccino"
 
     echo ""
@@ -139,7 +139,7 @@ verify_ch03() {
     # Check port 8081 first, fallback to 8080 if tested individually, and container fallback if VPN shadow
     check \
         "Container responds on mapped port (8081 or 8080)" \
-        "curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:8081 || curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:8080 || (docker inspect learn-ch01-broken --format '{{json .HostConfig.PortBindings}}' 2>/dev/null | grep -qE '8081|8080' && docker exec learn-ch01-broken wget -qO- http://127.0.0.1:80 >/dev/null 2>&1)"
+        "curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:8081 || curl -sf --connect-timeout 1 --max-time 2 http://127.0.0.1:8080 || (docker inspect learn-ch01-broken --format '{{json .HostConfig.PortBindings}}' 2>/dev/null | grep -qE '8081|8080' && docker exec learn-ch01-broken sh -c 'wget -qO- http://127.0.0.1:80 2>/dev/null || curl -sf http://127.0.0.1:80 2>/dev/null' >/dev/null 2>&1)"
 
     echo ""
 }

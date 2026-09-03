@@ -17,9 +17,17 @@ Check if a `verify.sh` exists for the current chapter:
 ls curriculum/chXX-*/challenges/verify.sh
 ```
 
-If it exists, run it:
+If it exists, run it for the current challenge (or omit argument to run all):
 ```bash
-bash curriculum/chXX-*/challenges/verify.sh
+bash curriculum/chXX-*/challenges/verify.sh [challenge_number]
+```
+For example, to verify challenge 1:
+```bash
+bash curriculum/ch01-containers/challenges/verify.sh 1
+```
+Or to verify all challenges in the chapter:
+```bash
+bash curriculum/ch01-containers/challenges/verify.sh all
 ```
 
 If it doesn't exist, read the challenge file and check the success criteria manually using Docker/kubectl commands.

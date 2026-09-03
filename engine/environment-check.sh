@@ -44,13 +44,8 @@ fi
 echo ""
 echo "[System]"
 if command -v df &> /dev/null; then
-    # Get available space in GB (works on macOS and Linux)
-    if [[ "$(uname)" == "Darwin" ]]; then
-        AVAIL_GB=$(df -g / | tail -1 | awk '{print $4}')
-    else
-        AVAIL_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
-    fi
-
+    # Get available space in GB (POSIX-compliant, works on Linux, macOS, WSL)
+    AVAIL_GB=$(df -Pk . 2>/dev/null | awk 'NR==2 {print int($4 / 1048576)}')
     AVAIL_GB=${AVAIL_GB:-0}
     if [ "$AVAIL_GB" -ge 5 ] 2>/dev/null; then
         pass "Disk space: ${AVAIL_GB}GB available (>5GB required)"
@@ -84,14 +79,14 @@ fi
 echo ""
 echo "[Kubernetes (needed for Chapters 6-7)]"
 if command -v kubectl &> /dev/null; then
-    KUBECTL_VERSION=$(kubectl version --client -o json 2>/dev/null | grep -oE '"gitVersion":\s*"v[^"]+' | grep -oE 'v[0-9.]+' || echo "unknown")
+    KUBECTL_VERSION=$(kubectl version --client -o json 2>/dev/null | grep -oE '"gitVersion":\s*"v[^"]+' | grep -oE 'v[0-9.]+' | head -1 || echo "unknown")
     pass "kubectl installed (${KUBECTL_VERSION})"
 else
     warn "kubectl not installed. You'll need it for Chapters 6-7. Install: https://kubernetes.io/docs/tasks/tools/"
 fi
 
 if command -v kind &> /dev/null; then
-    KIND_VERSION=$(kind version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+    KIND_VERSION=$(kind version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")
     pass "kind installed (v${KIND_VERSION})"
 else
     warn "kind not installed. You'll need it for Chapters 6-7. Install: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
@@ -102,13 +97,34 @@ echo ""
 echo "[Port Availability]"
 check_port() {
     local port=$1
-    if ! lsof -i :"$port" &> /dev/null 2>&1; then
+    local in_use=0
+    if command -v ss &> /dev/null; then
+        if ss -tuln 2>/dev/null | grep -qE "[: ]${port}[ \t]"; then
+            in_use=1
+        fi
+    elif command -v lsof &> /dev/null; then
+        if lsof -i :"$port" &> /dev/null 2>&1; then
+            in_use=1
+        fi
+    elif command -v netstat &> /dev/null; then
+        if netstat -tuln 2>/dev/null | grep -qE "[: ]${port}[ \t]"; then
+            in_use=1
+        fi
+    else
+        if (exec 3<>/dev/tcp/127.0.0.1/"$port") 2>/dev/null; then
+            exec 3>&-
+            in_use=1
+        fi
+    fi
+
+    if [ "$in_use" -eq 0 ]; then
         pass "Port $port is available"
     else
         warn "Port $port is in use. Some challenges may need a different port."
     fi
 }
 check_port 8080
+check_port 8081
 check_port 3000
 check_port 5432
 

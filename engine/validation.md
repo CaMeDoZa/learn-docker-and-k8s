@@ -13,9 +13,11 @@ Every `verify.sh` follows this contract:
 
 ```bash
 #!/bin/bash
+# Usage: ./verify.sh [challenge_number|all]
 # Exit 0 = all checks passed
 # Exit 1 = one or more checks failed
 # Output: human-readable status for each check
+```
 
 # Example check pattern:
 check_result() {

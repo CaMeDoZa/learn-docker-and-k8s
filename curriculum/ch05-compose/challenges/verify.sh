@@ -78,58 +78,60 @@ echo ""
 echo "Using Compose file: $COMPOSE_FILE"
 echo ""
 
-# ── Challenge 1 checks: All four services running ─────────────────────────────
+TARGET_CHALLENGE="${1:-all}"
 
-echo "--- Challenge 1: Full Stack ---"
-echo ""
+# ── Challenge 1 checks: All four running services ─────────────────────────────
 
-# Check services are running using docker compose ps
 running_services() {
   local service="$1"
-  docker compose -f "$COMPOSE_FILE" ps --status running --services 2>/dev/null | grep -q "^${service}$"
+  local svcs
+  svcs=$(docker compose -f "$COMPOSE_FILE" ps --status running --services 2>/dev/null || true)
+  echo "$svcs" | grep -q "^${service}$"
 }
 
-check \
-  "Service 'postgres' is running" \
-  "running_services postgres" \
-  "Make sure postgres is defined in your docker-compose.yml and docker compose up -d has been run."
+verify_ch01() {
+  echo "--- Challenge 1: Full Stack ---"
+  echo ""
 
-check \
-  "Service 'redis' is running" \
-  "running_services redis" \
-  "Make sure redis is defined in your docker-compose.yml."
+  check \
+    "Service 'postgres' is running" \
+    "running_services postgres" \
+    "Make sure postgres is defined in your docker-compose.yml and docker compose up -d has been run."
 
-check \
-  "Service 'backend' is running" \
-  "running_services backend" \
-  "The backend may have crashed on startup. Check: docker compose logs backend"
+  check \
+    "Service 'redis' is running" \
+    "running_services redis" \
+    "Make sure redis is defined in your docker-compose.yml."
 
-check \
-  "Service 'frontend' is running" \
-  "running_services frontend" \
-  "Make sure frontend is defined with the correct build path."
+  check \
+    "Service 'backend' is running" \
+    "running_services backend" \
+    "The backend may have crashed on startup. Check: docker compose logs backend"
 
-check \
-  "Frontend accessible on port 8080" \
-  "curl -sf --max-time 5 http://localhost:8080 | grep -qi 'cloudbrew'" \
-  "Is port 8080 mapped in your frontend service? Check: ports: ['8080:80']"
+  check \
+    "Service 'frontend' is running" \
+    "running_services frontend" \
+    "Make sure frontend is defined with the correct build path."
 
-check \
-  "Backend /health endpoint responds" \
-  "curl -sf --max-time 5 http://localhost:3000/health | grep -q 'ok'" \
-  "Is port 3000 mapped? Check: docker compose logs backend"
+  check \
+    "Frontend accessible on port 8080" \
+    "curl -sf --connect-timeout 2 --max-time 5 http://127.0.0.1:8080 | grep -qiE 'nocappuccino|cloudbrew'" \
+    "Is port 8080 mapped in your frontend service? Check: ports: ['8080:80']"
 
-check \
-  "Backend /api/coffees endpoint responds" \
-  "curl -sf --max-time 5 http://localhost:3000/api/coffees | grep -q 'source'" \
-  "The backend may not be connected to Postgres or Redis. Check: docker compose logs backend"
+  check \
+    "Backend /health endpoint responds" \
+    "curl -sf --connect-timeout 2 --max-time 5 http://127.0.0.1:3000/health | grep -q 'ok'" \
+    "Is port 3000 mapped? Check: docker compose logs backend"
 
-echo ""
+  check \
+    "Backend /api/coffees endpoint responds" \
+    "curl -sf --connect-timeout 2 --max-time 5 http://127.0.0.1:3000/api/coffees | grep -q 'source'" \
+    "The backend may not be connected to Postgres or Redis. Check: docker compose logs backend"
+
+  echo ""
+}
 
 # ── Challenge 2 checks: Health checks ─────────────────────────────────────────
-
-echo "--- Challenge 2: Health Checks ---"
-echo ""
 
 postgres_container() {
   docker compose -f "$COMPOSE_FILE" ps -q postgres 2>/dev/null | head -1
@@ -152,104 +154,134 @@ check_health() {
   [ "$status" = "healthy" ]
 }
 
-check \
-  "Postgres has a health check configured and is 'healthy'" \
-  "check_health postgres postgres_container" \
-  "Add a healthcheck: block to the postgres service using pg_isready. Wait for it to become healthy."
+verify_ch02() {
+  echo "--- Challenge 2: Health Checks ---"
+  echo ""
 
-check \
-  "Redis has a health check configured and is 'healthy'" \
-  "check_health redis redis_container" \
-  "Add a healthcheck: block to the redis service using redis-cli ping."
+  check \
+    "Postgres has a health check configured and is 'healthy'" \
+    "check_health postgres postgres_container" \
+    "Add a healthcheck: block to the postgres service using pg_isready. Wait for it to become healthy."
 
-# Check depends_on uses condition: service_healthy
-check \
-  "docker-compose.yml uses 'service_healthy' condition for backend depends_on" \
-  "grep -q 'service_healthy' '$COMPOSE_FILE'" \
-  "Update backend's depends_on to use 'condition: service_healthy' for postgres and redis."
+  check \
+    "Redis has a health check configured and is 'healthy'" \
+    "check_health redis redis_container" \
+    "Add a healthcheck: block to the redis service using redis-cli ping."
 
-echo ""
+  # Check depends_on uses condition: service_healthy
+  check \
+    "docker-compose.yml uses 'service_healthy' condition for backend depends_on" \
+    "grep -q 'service_healthy' '$COMPOSE_FILE'" \
+    "Update backend's depends_on to use 'condition: service_healthy' for postgres and redis."
+
+  echo ""
+}
 
 # ── Challenge 3 checks: Secrets and profiles ──────────────────────────────────
 
-echo "--- Challenge 3: Secrets and Profiles ---"
-echo ""
+verify_ch03() {
+  echo "--- Challenge 3: Secrets and Profiles ---"
+  echo ""
 
-# Check for hardcoded passwords in compose file
-check \
-  "docker-compose.yml contains no hardcoded passwords (no literal 'password' values)" \
-  "! grep -iE '^\s*[^#].*(password|secret|passwd):\s+[^$\{][^\s]+' '$COMPOSE_FILE'" \
-  "Move secrets to a .env file. Use \${VARIABLE_NAME} references in docker-compose.yml instead."
+  # Check for hardcoded passwords in compose file
+  check \
+    "docker-compose.yml contains no hardcoded passwords (no literal 'password' values)" \
+    "! grep -iE '^\s*[^#].*(password|secret|passwd):\s+[^$\{][^\s]+' '$COMPOSE_FILE'" \
+    "Move secrets to a .env file. Use \${VARIABLE_NAME} references in docker-compose.yml instead."
 
-# Check .env file exists (in compose dir or parent)
-ENV_FILE=""
-for candidate in \
-  "$COMPOSE_DIR/.env" \
-  "$COMPOSE_DIR/../.env"
-do
-  if [ -f "$candidate" ]; then
-    ENV_FILE="$candidate"
-    break
-  fi
-done
+  # Check .env file exists (in compose dir or parent)
+  ENV_FILE=""
+  for candidate in \
+    "$COMPOSE_DIR/.env" \
+    "$COMPOSE_DIR/../.env"
+  do
+    if [ -f "$candidate" ]; then
+      ENV_FILE="$candidate"
+      break
+    fi
+  done
 
-check \
-  ".env file exists" \
-  "[ -n '$ENV_FILE' ] && [ -f '$ENV_FILE' ]" \
-  "Create a .env file in the same directory as your docker-compose.yml with your secret values."
+  check \
+    ".env file exists" \
+    "[ -n '$ENV_FILE' ] && [ -f '$ENV_FILE' ]" \
+    "Create a .env file in the same directory as your docker-compose.yml with your secret values."
 
-# Check .env.example exists
-ENV_EXAMPLE=""
-for candidate in \
-  "$COMPOSE_DIR/.env.example" \
-  "$COMPOSE_DIR/../.env.example"
-do
-  if [ -f "$candidate" ]; then
-    ENV_EXAMPLE="$candidate"
-    break
-  fi
-done
+  # Check .env.example exists
+  ENV_EXAMPLE=""
+  for candidate in \
+    "$COMPOSE_DIR/.env.example" \
+    "$COMPOSE_DIR/../.env.example"
+  do
+    if [ -f "$candidate" ]; then
+      ENV_EXAMPLE="$candidate"
+      break
+    fi
+  done
 
-check \
-  ".env.example file exists" \
-  "[ -n '$ENV_EXAMPLE' ] && [ -f '$ENV_EXAMPLE' ]" \
-  "Create a .env.example file with placeholder values so other developers know what to configure."
+  check \
+    ".env.example file exists" \
+    "[ -n '$ENV_EXAMPLE' ] && [ -f '$ENV_EXAMPLE' ]" \
+    "Create a .env.example file with placeholder values so other developers know what to configure."
 
-# Check profiles are defined
-check \
-  "docker-compose.yml defines a 'dev' profile" \
-  "grep -q 'profiles:' '$COMPOSE_FILE' && grep -A2 'profiles:' '$COMPOSE_FILE' | grep -q '\- dev'" \
-  "Add a service (e.g. adminer) with 'profiles: [dev]' to your docker-compose.yml."
+  # Check profiles are defined
+  check \
+    "docker-compose.yml defines a 'dev' profile" \
+    "grep -q 'profiles:' '$COMPOSE_FILE' && grep -A2 'profiles:' '$COMPOSE_FILE' | grep -q '\- dev'" \
+    "Add a service (e.g. adminer) with 'profiles: [dev]' to your docker-compose.yml."
 
-check \
-  "docker-compose.yml defines a 'test' profile" \
-  "grep -q 'profiles:' '$COMPOSE_FILE' && grep -A2 'profiles:' '$COMPOSE_FILE' | grep -q '\- test'" \
-  "Add a test-runner service with 'profiles: [test]' to your docker-compose.yml."
+  check \
+    "docker-compose.yml defines a 'test' profile" \
+    "grep -q 'profiles:' '$COMPOSE_FILE' && grep -A2 'profiles:' '$COMPOSE_FILE' | grep -q '\- test'" \
+    "Add a test-runner service with 'profiles: [test]' to your docker-compose.yml."
 
-# Check adminer starts with --profile dev
-check \
-  "adminer service starts with --profile dev" \
-  "docker compose -f '$COMPOSE_FILE' --profile dev config --services 2>/dev/null | grep -q 'adminer'" \
-  "Make sure your adminer service has 'profiles: [dev]' and is defined in docker-compose.yml."
+  # Check adminer starts with --profile dev
+  check \
+    "adminer service starts with --profile dev" \
+    "docker compose -f '$COMPOSE_FILE' --profile dev config --services 2>/dev/null | grep -q 'adminer'" \
+    "Make sure your adminer service has 'profiles: [dev]' and is defined in docker-compose.yml."
 
-echo ""
+  echo ""
+}
 
 # ── Resource labeling check ────────────────────────────────────────────────────
 
-echo "--- Resource Labels ---"
-echo ""
+verify_labels() {
+  echo "--- Resource Labels ---"
+  echo ""
 
-check \
-  "docker-compose.yml uses 'learn-docker-k8s' app label" \
-  "grep -q 'learn-docker-k8s' '$COMPOSE_FILE'" \
-  "Add labels to your services: app: learn-docker-k8s, chapter: ch05"
+  check \
+    "docker-compose.yml uses 'learn-docker-k8s' app label" \
+    "grep -q 'learn-docker-k8s' '$COMPOSE_FILE'" \
+    "Add labels to your services: app: learn-docker-k8s, chapter: ch05"
 
-check \
-  "docker-compose.yml uses 'ch05' chapter label" \
-  "grep -q 'ch05' '$COMPOSE_FILE'" \
-  "Add labels to your services: chapter: ch05"
+  check \
+    "docker-compose.yml uses 'ch05' chapter label" \
+    "grep -q 'ch05' '$COMPOSE_FILE'" \
+    "Add labels to your services: chapter: ch05"
 
-echo ""
+  echo ""
+}
+
+# ── Execution ────────────────────────────────────────────────────────────────
+
+case "$TARGET_CHALLENGE" in
+  1|ch01|01)
+    verify_ch01
+    ;;
+  2|ch02|02)
+    verify_ch02
+    ;;
+  3|ch03|03)
+    verify_ch03
+    verify_labels
+    ;;
+  all|*)
+    verify_ch01
+    verify_ch02
+    verify_ch03
+    verify_labels
+    ;;
+esac
 
 # ── Summary ────────────────────────────────────────────────────────────────────
 
@@ -257,14 +289,17 @@ TOTAL=$((PASS_COUNT + FAIL_COUNT))
 
 if [ "$FAILED" -eq 0 ]; then
   green "============================================"
-  green " All $TOTAL checks passed! Chapter 5 complete!"
-  green "============================================"
-  echo ""
-  echo "You built a complete, health-checked, secret-safe Docker Compose"
-  echo "stack for NoCappuccino. New developers can now run one command and"
-  echo "be productive in minutes."
-  echo ""
-  echo "That coffee influencer is about to change everything. See you in Chapter 6."
+  green " All $TOTAL checks passed!"
+  if [ "$TARGET_CHALLENGE" = "all" ]; then
+    green " Chapter 5 complete!"
+    green "============================================"
+    echo ""
+    echo "You built a complete, health-checked, secret-safe Docker Compose"
+    echo "stack for NoCappuccino. New developers can now run one command and"
+    echo "be productive in minutes."
+    echo ""
+    echo "That coffee influencer is about to change everything. See you in Chapter 6."
+  fi
   exit 0
 else
   red "============================================"

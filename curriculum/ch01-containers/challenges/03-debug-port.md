@@ -27,12 +27,12 @@ docker run -d \
 Now try to access it:
 
 ```bash
-curl http://localhost:8080
+curl http://localhost:8081
 ```
 
 You'll get something like:
 ```
-curl: (7) Failed to connect to localhost port 8080 after 0 ms: Connection refused
+curl: (7) Failed to connect to localhost port 8081 after 0 ms: Connection refused
 ```
 
 The container is running. You can verify:
@@ -48,9 +48,9 @@ Status shows `Up`. But it's not reachable.
 ## Your Mission
 
 1. **Diagnose** why the container is unreachable
-2. **Fix it** — get nginx accessible at `http://localhost:8080`
+2. **Fix it** — get nginx accessible at `http://localhost:8081`
 
-The fix means stopping the broken container, removing it, and running a corrected version still named `learn-ch01-broken` on port 8080.
+The fix means stopping the broken container, removing it, and running a corrected version still named `learn-ch01-broken` on port 8081 (using port 8081 so it doesn't collide with `learn-ch01-nginx` on 8080).
 
 ---
 
@@ -59,7 +59,7 @@ The fix means stopping the broken container, removing it, and running a correcte
 Your fixed container must:
 
 - Be named `learn-ch01-broken`
-- Serve nginx content at `http://localhost:8080`
+- Serve nginx content at `http://localhost:8081`
 - Have both labels:
   - `--label app=learn-docker-k8s`
   - `--label chapter=ch01`
@@ -69,15 +69,13 @@ Your fixed container must:
 ## Success Criteria
 
 ```bash
-curl -s http://localhost:8080 | grep "Welcome to nginx"
+curl -s http://localhost:8081 | grep "Welcome to nginx"
 ```
 
-Should return the nginx welcome HTML.
-
-You can also run the full verification:
+You can also run the verification script:
 
 ```bash
-bash curriculum/ch01-containers/challenges/verify.sh
+bash curriculum/ch01-containers/challenges/verify.sh 3
 ```
 
 ---
@@ -114,7 +112,7 @@ docker stop learn-ch01-broken
 docker rm learn-ch01-broken
 ```
 
-Then run it again with the same name and labels — but this time include the flag that maps a host port to the container's port 80. You want it accessible at port 8080 on your host.
+Then run it again with the same name and labels — but this time include the flag that maps host port 8081 to the container's port 80 (`-p 8081:80`).
 
 </details>
 

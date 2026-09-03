@@ -128,6 +128,14 @@ check_port 8081
 check_port 3000
 check_port 5432
 
+# --- Network Subnet Overlaps ---
+if command -v ip &> /dev/null; then
+    OVERLAP=$(ip route show 2>/dev/null | grep -E "172\.17\." | grep -v "dev docker0" | head -1 || true)
+    if [ -n "$OVERLAP" ]; then
+        warn "VPN route overlap detected: '$OVERLAP' shadows Docker default bridge (docker0)."
+    fi
+fi
+
 # --- Leftover Resources ---
 echo ""
 echo "[Cleanup Check]"
